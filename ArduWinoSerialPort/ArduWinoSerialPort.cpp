@@ -189,3 +189,12 @@ void ArduWinoSerialPort::close() {
         CloseHandle(this->hSerial);
     }
 }
+
+bool ArduWinoSerialPort::operator!() {
+    return open() != 0;
+}
+
+ArduWinoSerialPort::operator bool() {
+    return open() == 0;
+}
+

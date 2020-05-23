@@ -12,7 +12,7 @@ using namespace std;
 const char* portName = "\\\\.\\COM18";
 
 //Declare a global object
-ArduWinoSerialPort* arduino;
+ArduWinoSerialPort* arduinoSerial;
 
 char receivedString[DATA_LENGTH];
 int (*funcArray[10])(string args);
@@ -25,11 +25,10 @@ int main(void)
     ofstream os;
     string cmd;
 
-
-    arduino = new ArduWinoSerialPort(portName);
-
+    ArduWinoSerialPort asp(portName);
+    //arduinoSerial = new ArduWinoSerialPort(portName);
     while (true) {
-        while (arduino->open() != 0) {
+        while (!asp) {
             cout << "ERROR!" << endl;
             Sleep(1000);
         }
@@ -43,6 +42,7 @@ int main(void)
         //    cout << "Sleeping..." << endl;
         //    //Sleep(5000);
         //} while (true);
+        cout << "Here" << endl;
         Sleep(2000);
         
     }
