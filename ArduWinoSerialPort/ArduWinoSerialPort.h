@@ -1,3 +1,10 @@
+/*
+    Enhanced version of SerialClass https://playground.arduino.cc/Interfacing/CPPWindows/
+    Author: Unknown
+    License: MIT
+    Modified by: Petar Georgiev
+*/
+
 #pragma once
 
 #include <Windows.h>
