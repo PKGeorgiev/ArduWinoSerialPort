@@ -19,33 +19,35 @@ int (*funcArray[10])(string args);
 
 int main(void)
 {
-    string line;
-    stringbuf sb;
-    stringstream ss;
-    ofstream os;
-    string cmd;
+	string line;
+	stringbuf sb;
+	stringstream ss;
+	ofstream os;
+	string cmd;
 
-    ArduWinoSerialPort asp(portName);
-    //arduinoSerial = new ArduWinoSerialPort(portName);
-    while (true) {
-        while (!asp) {
-            cout << "ERROR!" << endl;
-            Sleep(1000);
-        }
-        int bytesReceived = 0;
-        int a;
-        //cin >> a;
-        //do {
-        //    bytesReceived = arduino->readSerialPort(receivedString, DATA_LENGTH, 1000);
-        //    if (bytesReceived)
-        //        cout << receivedString;
-        //    cout << "Sleeping..." << endl;
-        //    //Sleep(5000);
-        //} while (true);
-        cout << "Here" << endl;
-        Sleep(2000);
-        
-    }
+	ArduWinoSerialPort arduinoSerial(portName, 9600);
+
+	while (true) {
+		while (!arduinoSerial) {
+			cout << "ERROR!" << endl;
+			Sleep(1000);
+		}
+
+		string str = arduinoSerial.readStringUntilTimeout();
+		if (str != "") {
+		    cout << "Here: " << str << endl;
+
+			//arduinoSerial.println("sd");
+		    
+		}
+		else {
+		    //cout << arduinoSerial.timedAvailable() << endl;
+		    
+		}
+
+
+
+	}
 
 
 }

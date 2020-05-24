@@ -1,4 +1,5 @@
 #include "ArduWinoSerialPort.h"
+#include <string>
 
 using namespace std;
 
@@ -108,7 +109,7 @@ DWORD ArduWinoSerialPort::open()
     return 0;
 }
 
-bool ArduWinoSerialPort::IsConnected()
+bool ArduWinoSerialPort::isConnected()
 {
     return this->connected;
 }
@@ -128,30 +129,32 @@ void ArduWinoSerialPort::rxReaderFunc()
             {
                 if (dwIncommingReadSize > 0)
                 {
-                    std::lock_guard<std::mutex> lock1(this->mutex);  
-                    rxStream << buf;
-                    rxBuffer.append(buf, dwIncommingReadSize);
-                    cout << "\nRX: " << rxBuffer << "\n";
+                    std::unique_lock<std::mutex> lck(this->bufferMutex);
+                    rxBuffer.append(buf, dwIncommingReadSize);                    
+                    //cout << "\nRX: " << rxBuffer << "\n";
                 }
             } else
             {
                 setError();
             }
         } while (dwIncommingReadSize > 0);
+        
+        cvRxBuffer.notify_all();
     }
     else {
         setError();
     }
 }
 
-void ArduWinoSerialPort::rxWorkerFunc(int num) {
+void ArduWinoSerialPort::rxWorkerFunc(int num) 
+{
     while (true) {
         if (connected)
         {
             rxReaderFunc();
         } else {
             cout << "Sleeping" << endl;
-            std::unique_lock<std::mutex> lck(workerMutex);
+            std::unique_lock<std::mutex> lck(workerMutex);            
             cv.wait(lck);
             cout << "Resumed" << endl;
         };
@@ -175,14 +178,16 @@ bool ArduWinoSerialPort::writeBytes(const char* buffer, unsigned int buf_size)
     return true;
 }
 
-DWORD ArduWinoSerialPort::setError() {
+DWORD ArduWinoSerialPort::setError() 
+{
     close();
     connected = false;
     lastError = GetLastError();  
     return lastError;
 }
 
-void ArduWinoSerialPort::close() {
+void ArduWinoSerialPort::close() 
+{
     if (this->connected)
     {
         this->connected = false;
@@ -190,11 +195,119 @@ void ArduWinoSerialPort::close() {
     }
 }
 
-bool ArduWinoSerialPort::operator!() {
-    return open() != 0;
-}
+//bool ArduWinoSerialPort::operator!() {
+//    return open() != 0;
+//}
 
-ArduWinoSerialPort::operator bool() {
+ArduWinoSerialPort::operator bool() 
+{
     return open() == 0;
 }
 
+int ArduWinoSerialPort::available() 
+{
+    std::lock_guard<std::mutex> lck(this->bufferMutex);
+    return rxBuffer.length();
+}
+
+int ArduWinoSerialPort::read()
+{
+    std::lock_guard<std::mutex> lck(this->bufferMutex);
+    
+    if (rxBuffer.length() == 0)
+        return -1;
+    else
+    {
+        int ch = rxBuffer[0];
+        rxBuffer.erase(0, 1);
+        return ch;
+    }
+}
+
+int ArduWinoSerialPort::timedRead()
+{
+    if (timedAvailable() > 0)
+        return read();
+
+    return -1;
+}
+
+long long ArduWinoSerialPort::millis() 
+{
+    auto start = std::chrono::system_clock::now();
+    auto start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
+    auto value = start_ms.time_since_epoch();
+    return value.count();
+}
+
+int ArduWinoSerialPort::timedAvailable() 
+{
+    int timeout = this->timeout;
+    int avb = 0;
+
+    std::unique_lock<std::mutex> lck(bytesAvailableMutex);
+
+    do 
+    {
+        avb = available();
+
+        if (avb > 0)
+            return avb;
+        else
+        {
+            cv.wait_for(lck, std::chrono::milliseconds(100));
+        }
+
+        timeout -= 100;
+    } while (timeout > 0);
+
+    return available();
+}
+
+bool ArduWinoSerialPort::isDelimiter(char ch, string delimiters) 
+{
+    return delimiters.find(ch) != string::npos;
+}
+
+string ArduWinoSerialPort::readStringUntilTimeout(string delimiters) 
+{
+    if (timedAvailable() > 0)
+    {
+        std::lock_guard<std::mutex> lck(this->bufferMutex);
+
+        for (size_t i = 0; i < rxBuffer.length(); i++)
+        {
+            if (this->isDelimiter(rxBuffer[i], delimiters))
+            {
+                string res = rxBuffer.substr(0, i);
+                rxBuffer.erase(0, i + 1);
+                return res;
+            }
+        }
+    }
+
+    return string("");
+}
+
+string ArduWinoSerialPort::readStringUntil(string delimiters) 
+{
+    string ret;
+    int c = timedRead();
+    while (c >= 0 && !isDelimiter(c, delimiters))
+    {
+        ret += (char)c;
+        c = timedRead();
+    }
+    return ret;
+}
+
+bool ArduWinoSerialPort::print(string &str) 
+{
+    return writeBytes(str.c_str(), str.length());
+}
+
+bool ArduWinoSerialPort::println(string str) 
+{
+    str += '\n';
+    return writeBytes(str.c_str(), str.length());
+}
